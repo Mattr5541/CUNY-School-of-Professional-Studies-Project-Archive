@@ -1,0 +1,347 @@
+---
+title: "Final Project NHIS"
+author: "Matthew Roland"
+output: pdf_document
+---
+
+
+```{r echo=FALSE, include = FALSE}
+# load packages
+
+library(tidyverse)
+library(knitr)
+library(ggplot2)
+library(car)
+```
+
+```{r}
+# load data
+
+link <- "https://media.githubusercontent.com/media/Mattr5541/DATA_606_Final_Project/main/adult22.csv"
+
+  
+nhis <- read.csv(url(link), stringsAsFactors = F)
+
+colnames(nhis)
+
+##I will subset my variables of interest, including participant IDs, race, region (metropolitan vs. non-metropolitan), sex, age, whether the participant has taken medication for their mental health within the past 12 months, whether the participant has undergone therapy within the past 12 months, whether costs for utilization deterred therapy, education, and depression levels.
+
+nhis_vars <- nhis %>% subset(select = c(HHX, RACEALLP_A, URBRRL, SEX_A, AGEP_A, MHRX_A, MHTHRPY_A, MHTHND_A, EDUCP_A, PHQ81_A, PHQ82_A, PHQ83_A, PHQ84_A, PHQ85_A, PHQ86_A, PHQ87_A, PHQ88_A, PHQCAT_A))
+```
+
+### Abstract
+
+This analysis aims to examine the relationships among region, educational attainment, and depression levels, as indicated by the PHQ scale. I hypothesized that: 1) living in metropolitan regions would be associated with higher levels of depression; 2) having higher levels of educational attainment would predict lower levels of depression; 3) educational achievement would moderate the relationship between region and depression such that individuals in non-metropolitan regions would have lower levels of depression. A multiple regression analysis was used to assess this relationship, using mean PHQ scores as the outcome variable, educational attainment as a predictor, and region as a nominal predictor. In contrast to expectations, living in non-metropolitan regions was associated with higher levels of depression than living in metropolitan regions. Also, higher levels of education were associated with higher levels of depression. However, an interaction effect revealed that educational achievement moderated mean depression scores such that individuals living in smaller metropolitan areas or non-metropolitan areas were more likely to have lower levels of depression when educational attainment was higher (Undergraduate to graduate/post-graduate). Although not entirely in line with expectations, these results may have implications regarding the importance of providing mental health care for individuals in non-metropolitan regions. Also, the results may have implications for the role of education in moderating depression in smaller metropolitan regions. Of course, none of the findings provided in this analysis are causal in nature. 
+
+
+### Part 1 - Introduction
+
+An important consideration in our modern, densely populated world is the impact of living conditions and residence on our mental health. Such topics have been studied indirectly via animal research and through observational approaches in humans. An example of this would type of research would be John Calhoon's seminal "Behavioral Sink" experiment, in which rats were placed into overcrowded conditions to examine the effects of living condition on behavior (Calhoon, 1962). Researchers have attempted to generalize the results of Calhoon's work to humans, specifically, within the context of how crowded yet socially isolated urban environments may impact mental health. Of course, due to the nature of this type of research question, experimental approaches are severely limited; thus, most of the evidence that we have gathered is through observational and archival approaches, which cannot provide causal evidence of the impacts of such environments on mental health. Typically, researchers have found that urban environments have higher incidences of poor mental health outcomes (cite, if possible)
+
+Another question that individuals may pose would be the link between education and mental health outcomes. Researchers have found that higher educational achievements corresponds with better mental health outcomes in adults (Bauldry, 2015)
+
+My goal is to expand on these findings by examining the relationships among environmental conditions, education, and mental health. Specifically, I want to know whether living in a metropolitan region (large or small) versus a smaller, non-metropolitan region is associated with higher rates of depression. In addition, I am interested in seeing whether lower levels of one's highest education are associated with higher rates of depression. Finally, I want to see if there is an interaction effect between region and education on rates of depression.
+
+The data used in this analysis were sourced from the 2022 National Health Interview Survey (NHIS) data collected by the CDC. This dataset contains survey and questionnaire data detailing demographic and mental/physical health data for individuals in the US in the year 2022. I will be using the adult survey dataset, and I plan to restrict my analysis to adults aged 25 - 36, as I am interested in seeing the environmental, education, and depression trends in the late Gen Z and Millennial generations.
+
+#### Variable Information
+
+##### Region
+
+Region classifications were defined along CDC guidelines. **large central metro regions** were defined as counties in metropolitan areas of one million or more individuals and either: contain the largest principle city in the metro area; are contained in the largest principle city; or contain at least 250,000 residents of any principle city of the metro area. **Large fringe metro areas** were defined as counties in metropolitan areas of one million or more individuals that do not possess the previously listed criteria that define a large central metro region. **Medium and small metro regions** are defined as counties that in metropolitan areas that contain 250,000 to 999,000 individuals, or metropolitan areas that contain less than 250,000 individuals. Finally, **nonmetropolitan regions** are defined as counties in micropolitan areas and non-core counties
+
+The information provided above were derived from the NHIS codebook, and more detail can be found at the CDC's website: <https://www.cdc.gov/nchs/data_access/urban_rural.htm>.
+
+##### Education
+
+Education level was assessed via self-reports. Participants were asked about their highest levels of education, which ranged from "never attended/kindergarten only" to "Professional School or Doctoral degree", along with "Don't Know" and "Not Ascertained" options. For the sake of simplicity, I will only be analyzing a subset of these selections, including: "Grade 1-11," "High School Graduate," "Bachelor's degree", and I will combine both "Master's degree" and "Professional School or Doctoral degree" into a single metric
+
+##### Depression
+
+Depression was assessed via the 8-item Patient Health Questionnaire (PHQ-8; Kroenke et al., 2009), which measures symptoms associated with depression. This inventory contains items that correspond with DSM-IV depression criteria; however, the 8-item scale excludes a question on the 9-question scale pertaining to thoughts pertaining to self-harm and death. This dataset includes responses to all eight items, as well as a metric that aggregates each individuals' scores across each item to assess their levels of depression (this is represented by the PHQCAT_A variable). For my analysis, I will calculate the mean of each participant's overall PHQ scores and use that as my dependent variable.
+
+#### Goals & Hypotheses
+
+This analysis will explore the relationship among region, education level, depressive symptoms, and the interactions among these variables. To accomplish this, I will perform a Factorial ANOVA using both region and education level as predictors, and depressive symptoms as an outcome. I believe this analysis will be the most appropriate course of action, as my predictors are all categorical in nature, whereas my outcome is an aggregate of scores measured on a Likert scale. While there is some debate as to how Likert measurements should be calculated, it is common-practice to consider them as continuous or quantitative measurements, which makes them conducive to t-tests and ANOVAs as outcome variables.
+
+My hypotheses are as follows:
+
+**1. I predict that one's region of residence will significantly predict levels of depression such that residing in more metropolitan areas will predict higher levels of depression**
+
+**2. I predict that one's level of education will significantly predict levels of depression such that higher level of education (beyond high school) will predict higher levels of depression**
+
+**3. I predict that there will be a significant interaction between region and level of education on levels of depression such that higher levels of education will reduce the effects of region on levels of depression**
+
+### Part 2 - Data
+
+First, I will prepare my data:
+
+#### Filtering Ages
+```{r}
+##This code will filter the dataset such that only the observations of those between the age range of 26 to 36 will remain
+nhis_vars <- nhis_vars %>% filter(AGEP_A >= 26 & AGEP_A <= 36)
+
+nhis_vars %>% count()
+
+nhis_vars %>% count(AGEP_A) %>% mutate(prop = n / sum(n))
+```
+
+**Now, we are left with 4558 remaining observations in this dataset**
+**And, as we can see, the age distribution is rather uniform, overall, with around 300 to 500 participants per age**
+
+#### Education
+
+**Now I will recode the education variables to better fit my analysis goals**
+
+```{r}
+unique(nhis_vars$EDUCP_A)
+
+#Note, I will only be using the following codes: 01 = Grade 1 - 11, 04 = High School Graduate, 08 = Bachelors, 9 = Masters Degree, 10 = Post-Graduate Degree, 97 = Refused to Answer, 99 = Don't Know
+
+#I will also recode some of the other observation codes so they follow this sequence: 1 = Grade 1 - 11, 2 = High School Graduate, 3 = Bachelors, 4 = Graduate/Post-Graduate
+
+nhis_vars <- nhis_vars %>% mutate(EDUCP_A = ifelse(EDUCP_A == 4, 2, EDUCP_A))
+nhis_vars <- nhis_vars %>% mutate(EDUCP_A = ifelse(EDUCP_A == 8, 3, EDUCP_A))
+nhis_vars <- nhis_vars %>% mutate(EDUCP_A = ifelse(EDUCP_A == 9 | EDUCP_A == 10, 4, EDUCP_A))
+```
+
+```{r}
+nhis_vars <- nhis_vars %>% filter(EDUCP_A < 5)
+```
+
+
+#### Depression Levels
+
+**And finally, let's look at the the frequency of depression levels in the current sample**
+
+```{r}
+#The PHQ is a measure of depression. The PHQCAT_A aggregates depression scores on each subscale of the measure and assesses levels of depression 
+#Note: 1 = None/Minimal, 2 = Mild, 3 = Moderate, 4 = Severe, 8 = Not Ascertained
+nhis_dep <- nhis_vars %>% count(PHQCAT_A) %>% mutate(prop = n / sum(n))
+
+nhis_dep <- nhis_dep %>% 
+  mutate(PHQCAT_A = 
+           dplyr::recode(PHQCAT_A, 
+                  "1" = "None/Minimal", 
+                  "2" = "Mild",
+                  "3" = "Moderate",
+                  "4" = "Severe",
+                  "8" = "Not Ascertained"))
+
+kable(nhis_dep)
+
+
+ggplot(nhis_dep, aes(reorder(PHQCAT_A, -n), n, fill = PHQCAT_A)) + geom_bar(stat = "identity")  +  labs(title = "Depression Severity", x = "PHQ Score", y = "Freuqency")+ theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+#I would also like to make a mean variable for each PHQ scale, but first, I need to remove the "Not Ascertained" observations from the dataset
+
+nhis_vars <- nhis_vars %>% filter(across(c(PHQCAT_A,PHQ81_A, PHQ82_A, PHQ83_A, PHQ84_A, PHQ85_A, PHQ86_A, PHQ87_A, PHQ88_A), ~ . < 7))
+
+#And now, I can calculate the overall PHQ score mean for each remaining individual
+nhis_mean <- nhis_vars %>% mutate(PHQ_mean = rowMeans(dplyr::select(., PHQ81_A, PHQ82_A, PHQ83_A, PHQ84_A, PHQ85_A, PHQ86_A, PHQ87_A, PHQ88_A)))
+
+kable(mean(nhis_mean$PHQ_mean))
+```
+**As one would expect from a distribution representative of the population, most individuals sampled were identified as having mild or no depressive symptoms, with only a few marginal cases having severe depressive symptoms. As a result of this discrepancy, the analyses to come may be significantly impacted. Furthermore, the overall mean of the calculated mean of all PHQ variables is 1.35, when each individual mean can range from 1 - 4 in this dataset. [Therefore, I will run two versions of the analysis, one that included the none/mild cases, and one that includes individuals who are marked as having mild to severe symptoms]**
+
+Now let's check the normality of the data
+
+```{r}
+ggplot(data = nhis_mean, aes(x = PHQ_mean)) +
+        geom_blank() +
+        geom_histogram(aes(y = ..density..)) +
+        stat_function(fun = dnorm, args = c(mean = mean(nhis_mean$PHQ_mean), sd = sd(nhis_mean$PHQ_mean)), col = "tomato")
+
+ggplot(data = nhis_mean, aes(sample = PHQ_mean)) + 
+  geom_point(stat = "qq") 
+```
+These graphs indicate that there is a large amount of skew present in the dataset as a result of only a minor portion of the sample having moderate to severe depression symptoms. However, I can attempt to  rectifiy this via power transformations
+
+#### Summary tables and figures
+
+**I will now present tables and figures to represent our remaining sample following the previous modifications**
+
+##### Age and Gender
+
+```{r}
+nhis_mean %>% count()
+
+nhis_mean %>% count(AGEP_A) %>% mutate(prop = n / sum(n))
+
+nhis_gender <- nhis_mean %>% count(SEX_A) %>% mutate(prop = n / sum(n))
+
+kable(nhis_gender)
+
+nhis_gender <- nhis_gender %>% mutate(SEX_A = dplyr::recode(SEX_A, "1" = "Male", "2" = "Female", "9" = "Unknown"))
+
+ggplot(nhis_gender, aes(SEX_A, n, fill = SEX_A)) + geom_bar(stat = "identity")  +  labs(title = "Gender Frequency", x = "Gender", y = "Frequency") 
+```
+**The gender ratio is rather equivalent, with a slight difference such that there are more women than men**
+
+##### Region
+
+```{r}
+# Note: 1 = large central metro, 2 = large fringe metro, 3 = medium and small metro, and 4 = non-metropolitan
+nhis_region <- nhis_mean %>% count(URBRRL) %>% mutate(prop = n / sum(n))
+
+nhis_region <- nhis_region %>% 
+  mutate(URBRRL = 
+           dplyr::recode(URBRRL, 
+                  "1" = "Large central metro", 
+                  "2" = "Large fringe metro",
+                  "3" = "Medium and small metro",
+                  "4" = "Non-metro"))
+
+kable(nhis_region)
+
+ggplot(nhis_region, aes(URBRRL, n, fill = URBRRL)) + geom_bar(stat = "identity")  +  labs(title = "Region Frequency", x = "Region", y = "Frequency")+ theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+**Most of the participants were drawn from large central metro regions, followed by medium and small metro regions, followed by large fringe, and finally, non-metro regions. The disparity among these groups may have potential consequences for the analysis to come**
+
+###### Education
+
+```{r}
+nhis_edu <- nhis_vars %>% count(EDUCP_A) %>% mutate(prop = n / sum(n))
+
+nhis_edu <- nhis_edu %>% filter(EDUCP_A %in% c(1, 2, 3, 4, 97, 99))
+
+nhis_edu <- nhis_edu %>% mutate(EDUCP_A = dplyr::recode(EDUCP_A, "1" = "1st - 11th Grade", "2" = "High School", "3" = "Bachelors", "4" = "Graduate/Post-Graduate", "97" = "Refused", "99" = "Don't Know"))
+
+kable(nhis_edu)
+
+ggplot(nhis_edu, aes(reorder(EDUCP_A, n), n, fill = EDUCP_A)) + geom_bar(stat = "identity")  +  labs(title = "Education Levels", x = "Education", y = "Frequency")+ theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+**Most of the participants in this sample have attained at least a high school diploma, with the highest proportion having attained a Bachelor's degree**
+**Because of the negligible proportion of individuals who refused to answer or did not know their education level, I will remove those observations from the analysis**
+
+###### Dummy Coding Variables
+
+Because I will be performing a multiple regression analysis, I will need to dummy code my categorical variables
+
+```{r}
+nhis_fac <- nhis_mean %>% mutate_at(vars(EDUCP_A, URBRRL), as.factor)
+
+dummy <- model.matrix(~ URBRRL - 1, data = nhis_fac)
+nhis_dummy <- nhis_fac %>% cbind(dummy)
+
+dummy <- model.matrix(~ EDUCP_A - 1, data = nhis_fac)
+nhis_dummy <- nhis_dummy %>% cbind(dummy)
+
+nhis_dummy <- nhis_dummy %>% dplyr::rename("l_central" ="URBRRL1",
+                          "l_fringe" = "URBRRL2",
+                          "ms_metro" = "URBRRL3",
+                          "non_metro" = "URBRRL4",
+                          "drop" = "EDUCP_A1",
+                          "high" = "EDUCP_A2",
+                          "bachelor" = "EDUCP_A3",
+                          "grad" = "EDUCP_A4")
+
+```
+
+### Part 3 - Exploratory data analysis
+
+
+```{r}
+
+summary(p1 <- powerTransform(PHQ_mean ~ (l_fringe + ms_metro + non_metro) * (high + bachelor + grad), data = nhis_dummy))
+
+coef(p1, round = T)
+summary(m1 <- lm(bcPower(PHQ_mean, p1$roundlam) ~ (l_fringe + ms_metro + non_metro) * (high + bachelor + grad), data = nhis_dummy))
+
+
+plot(m1)
+
+shapiro.test(m1$residuals)
+```
+
+
+
+### Part 4 - Inference
+
+To assess the relationships among education level, regional differences, and mean depression scores, a multiple regression analysis using dummy coded observations for education levels and regional differences was used. In addition, a power analysis was performed to correct the normality violations present. Unfortunately, the power analysis wa not able to fully normalize the residuals. As a result, future analysts should consider more robust procedures.
+
+Based on this analysis, we can conclude that this model predicting changes in mean depression scores based on education levels and regional differences is statistically significant, F(15,3214) = 2.903, p < .001. However, this model may be a relatively poor fit for these data, based on the low Adjusted R^2 value (R^2 = .009). This may be a consequence of the normal, linear, and homoscedasticity violations in this model.
+
+Using this model, we can conclude that living in non-metropolitan regions significantly predicts higher depression scores than living in a metropolitan area (b = 0.077; p < .01). However, living in large fringe or small/medium sized-metropolitan areas versus large central metropolitan areas did not significantly predict changes in mean depression scores. 
+
+Interestingly, having a high school education (b = 0.05; p = .016), bachelor's degree (b = 0.10; p < .001), or a graduate to post-graduate degree (b = 0.08; p < .001) predicted higher mean depression scores than having dropped out of high school.
+
+Significant interaction effects emerged such that the role of education moderates the relationship between regional differences and mean depression scores. Specifically, mean depression scores are higher for those who live in a fringe metropolitan area and have a bachelor's degree (b = -0.07; p = .028) compared to those who live in a large central metro area and dropped out of high school. Similarly, living in a medium or small metropolitan area and having a bachelor's degree is associated with higher mean depression scores (b = -0.06; p = .021). In addition, living in a non-metropolitan area and having a bachelor's degree is associated with higher depression scores (b = -0.08; p = .013). Finally, living in a non-metropolitan area and having a graduate or post-graduate degree is associated with higher depression scores, as well (b = -.076; p = .04). 
+
+### Part 5 - Conclusion
+
+Based on the previous analysis, my hypothesis regarding the association between regional differences and mean depression levels was not supported. It would appear, based on this sample, that living in non-metropolitan areas is associated with higher mean depression ratings compared to large central metropolitan regions. Going back to the results generated in Calhoun's Behavioral Sink experiment, one would expect that living in a more busy, crowded region would predict the presence of psychopathologies. However, our analysis contradicts this argument. This could suggest (as others have suggested previously) that the conclusions of the Behavioral Sink experiment are not generalizable outside of rodent populations, or that psychopathologies are more likely to develop from severe overcrowding conditions, as opposed to the crowding seen in large metropolitan environments. Furthermore, the conclusions derived in this analysis could be a result of the sample characteristics. Clearly, there are far more participants who live in large metropolitan regions versus smaller regions. In the future, a more balanced sample can be employed for analysis. 
+
+My hypothesis stating that education levels would predict mean depression scores was incorrect; although the findings were statistically significant, higher education seems to be associated with higher levels of depression. Interestingly, mean depression scores appear to be highest for individuals with a Bachelor's degree (see the **Appendix**) These findings stands in contrast to expectations, but the estimate scores were rather low, indicating that the increases are only marginal. However, these findings may highlight the impact of high-stress jobs associated with higher education. Alternatively, perhaps depression scores just tend to be higher for those in higher education, corresponding with the old adage, "nature shows that with the growth of intelligence comes increased capacity for pain" (Schopenhauer). Of course, further analysis and experimentation are needed to substantiate any causal claims
+
+
+Finally, my hypothesis claiming that a combination of regional differences and education level would predict mean depression score differences was only partially supported. Based on the results, it would appear that education moderates the relationship between region and mean depression scores, such that higher education is associated with higher depression scores for those not living in metropolitan regions. 
+
+#### Limitations
+
+This analysis was limited by a few factors. For one, these data were collected as part of an NHIS study regarding mental health, and thus, these data were not collected for this specific analysis. Furthermore, certain groups were not equivalent, which may have impacted the results of the analysis. Finally, I did not explore the potential influence of extraneous factors that may mediate or moderate the relationships among education, region, and levels of depression. Further research could potentially explore income, race/ethnicity, or other variables as covariates.
+
+### References
+
+Bauldry, S. (2015). Variation in the protective effect of higher education against depression. *Society and mental health*, 5(2), 145-161.
+
+Calhoun, J. B. (1962). Population density and social pathology. *Scientific American*, 206(2), 139-149.
+
+Centers for Disease Control and Prevention. (2017, June 1). Data Access - Urban Rural classification scheme for Counties. Centers for Disease Control and Prevention. https://www.cdc.gov/nchs/data_access/urban_rural.htm 
+
+Chang-Quan, H., Zheng-Rong, W., Yong-Hong, L., Yi-Zhou, X., & Qing-Xiu, L. (2010). Education and risk for late life depression: a meta-analysis of published literature. *The International Journal of Psychiatry in Medicine*, 40(1), 109-124.
+
+National Center for Health Statistics. (2022). Center for Disease Control and Prevention. https://www.cdc.gov/nchs/nhis/2022nhis.htm
+
+powerTransform function - RDocumentation. (n.d.). https://www.rdocumentation.org/packages/car/versions/2.1-4/topics/powerTransform
+
+### Appendix
+
+```{r}
+nhis_dep_region <- nhis_dummy %>% group_by(URBRRL) %>% summarize(PHQ_mean = mean(PHQ_mean))
+
+nhis_dep_region <- nhis_dep_region %>% 
+  mutate(URBRRL = 
+           dplyr::recode(URBRRL, 
+                  "1" = "Large central metro", 
+                  "2" = "Large fringe metro",
+                  "3" = "Medium and small metro",
+                  "4" = "Non-metro")) 
+
+nhis_dep_region <- nhis_dep_region %>% rename(Region = URBRRL)
+
+kable(nhis_dep_region)
+
+ggplot(nhis_dep_region, aes(Region, PHQ_mean, fill = Region)) + geom_bar(stat = "identity")  +  labs(title = "Depression Severity by Region", x = "Region", y = "PHQ Mean")+ theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+```{r}
+nhis_dep_edu <- nhis_dummy %>% group_by(EDUCP_A) %>% summarize(PHQ_mean = mean(PHQ_mean))
+
+nhis_dep_edu <- nhis_dep_edu %>% mutate(EDUCP_A = dplyr::recode(EDUCP_A, "1" = "1st - 11th Grade", "2" = "High School", "3" = "Bachelors", "4" = "Graduate/Post-Graduate"))
+
+kable(nhis_dep_edu)
+
+ggplot(nhis_dep_edu, aes(reorder(EDUCP_A, PHQ_mean, desc), PHQ_mean, fill = EDUCP_A)) + geom_bar(stat = "identity")  +  labs(title = "Depression Severity by Education", x = "Education Level", y = "PHQ Mean")+ theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+nhis_int <- nhis_dummy %>% group_by(URBRRL, EDUCP_A)  %>% summarize(PHQ_mean = mean(PHQ_mean))
+
+nhis_int <- nhis_int %>% mutate(URBRRL = dplyr::recode(URBRRL, 
+                  "1" = "Large central metro", 
+                  "2" = "Large fringe metro",
+                  "3" = "Medium and small metro",
+                  "4" = "Non-metro"), EDUCP_A = dplyr::recode(EDUCP_A,
+                                                              "1" = "1st - 11th Grade", "2" = "High School", "3" = "Bachelors", "4" = "Graduate/Post-Graduate"))
+
+nhis_int <- nhis_int %>% rename(Education = EDUCP_A)
+nhis_int <- nhis_int %>% rename(Region = URBRRL)
+
+kable(nhis_int)
+
+nhis_int %>% ggplot(aes(Region, PHQ_mean, group = Education)) + geom_line(aes(color = Education)) + geom_point(aes(color = Education)) + theme(axis.text.x = element_text(angle = 45, hjust = 1)) + labs(title = "Mean Depression Scores as an Outcome of Region & Education", y = "PHQ Mean")
+
+nhis_int %>% ggplot(aes(Education, PHQ_mean, group = Region)) + geom_line(aes(color = Region)) + geom_point(aes(color = Region)) + theme(axis.text.x = element_text(angle = 45, hjust = 1))
