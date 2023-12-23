@@ -1,0 +1,154 @@
+---
+title: "Project 1"
+author: "Matthew Roland"
+date: "2023-09-22"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+options(repos = c(CRAN = 'https://mirror.las.iastate.edu/CRAN/'))
+install.packages(c("tidyverse", "dplyr", "readr", "stringr", "ggplot2", "knitr"))
+library(tidyverse)
+library(dplyr)
+library(readr)
+library(stringr)
+library(ggplot2)
+library(knitr)
+```
+
+## Loading the txt File
+
+The first step is to read the txt file into R as a table, and save it
+
+```{r cars}
+chess <- read.table("https://raw.githubusercontent.com/Mattr5541/DATA-607/main/Project%201/Chess.txt", 
+                    header = T, sep = "|", skip = 1, fill = T, quote = "")
+
+glimpse(chess)
+```
+
+## Cleaning the dataframe
+
+**Since the resulting dataframe is less than interpretable, the next step will be to clean the dataframe by removing any extraneous lines, characters, and columns. I started by removing all hyphens, cutting out some empty columns, and then by merging columns and rows where appropriate. This was accomplished by making a grouping variable called "merge" that groups every two together; I then created a new dataframe called chess_clean where all instances of "merge" that matched would be grouped into one row, and then, of course, I dropped the merge variable. Finally, I cleaned up any trailing spaces that were present in the observations**
+
+```{r}
+chess <- data_frame(chess)
+
+chess <- subset(chess, Pair != '-----------------------------------------------------------------------------------------')
+
+chess <- chess[-1,]
+
+chess <- chess[-11]
+
+
+chess$merge <- rep(1:(nrow(chess) / 2), each = 2)
+chess_clean <- chess %>% group_by(merge) %>% summarize_all(~paste(., collapse = "")) %>%
+  ungroup() %>% select(-merge)
+
+chess_clean <- chess_clean %>% mutate_all(trimws)
+
+chess_clean$Pair <- trimws(chess_clean$Pair)
+
+chess_clean$Player.Name <- trimws(chess_clean$Player.Name)
+```
+
+## Separating Variables 
+
+**I then separated the now-cleaned chess dataset where appropriate by using regular expressions and dplyr's separate function. This took quite a bit of trial and error to properly parse out the correct values, primarily due to the many uneven spaces throughout the observations**
+
+```{r}
+
+chess_sep <- chess_clean %>% separate(Pair, c('Pair', 'Player_State'))
+
+chess_sep <- chess_sep %>% separate(Player.Name, c('Player.Name', 'Rating'), sep = " / R: ")
+
+chess_sep$Player.Name <- gsub("[[0-9]+", "", chess_sep$Player.Name)   
+
+chess_sep$Player.Name <- trimws(chess_sep$Player.Name)
+
+chess_sep$Rating <- gsub("^[P].+|>.+", "", chess_sep$Rating) 
+chess_sep$Rating <- gsub("P\\d*|[- ]", "", chess_sep$Rating) 
+
+chess_sep$Total <- gsub("N:\\d+", "", chess_sep$Total) 
+```
+
+## Converting to long format 
+
+I then converted the dataframe to a long format in order to more easily match the opponents' ratings with each player (essentially, I wanted to convert the rounds into a grouping variable so I could match the opponents with the "Rating" column, and eventually, the "Pair" column). After that, I created a new dataframe consisting of the Pair IDs, and renamed "Pair" to "Opponent" and "Rating" to "Opponent_Rating." I then merged this into the chess dataframe, in order to match each "player with their corresponding opponents' ratings
+
+```{r}
+chess_long <- chess_sep %>% gather("Round", "Opponent", 6:12)
+
+chess_long$Opponent <- gsub("[A-Za-z]", "", chess_long$Opponent)
+
+chess_long$Opponent <- as.numeric(chess_long$Opponent)
+
+Ratings_sep <- chess_long %>% select(Opponent_Rating = Rating, Opponent = Pair)
+
+
+chess_long <- chess_long %>% arrange(Opponent)
+
+Ratings_sep <- Ratings_sep %>% arrange(Opponent)
+
+chess_merge <- merge(chess_long, Ratings_sep, by = "Opponent") %>% distinct()
+##Just to fix the overall layout of the players
+chess_merge <- chess_merge %>% arrange(Pair)
+```
+
+## Setting to Wide & Calculating Averages
+
+**Finally, I set the dataframe back to a wide format, calculated the row averages for every round, in order to determine opponent averages, and performed some last-minute cleaning procedures (removing unnecessary columns/renaming columns)**
+
+```{r}
+chess_wide <- chess_merge %>% pivot_wider(id_cols = c(Pair, Player.Name, Player_State, Total, Rating), names_from = Round, values_from = Opponent_Rating)
+
+chess_wide$Pair <- as.numeric(chess_wide$Pair)
+
+Rounds <- chess_wide[,c(6:12)]
+Rounds <- Rounds %>% mutate_at(1:7, as.numeric)
+
+Rounds$Opponent_Average <- rowMeans(Rounds, na.rm = T)
+Rounds$Opponent_Average <- round(Rounds$Opponent_Average, digits = 0)
+
+chess_wide$Opponent_Average <- Rounds$Opponent_Average
+
+chess_wide <- chess_wide %>% select(-c(1, 6:12))
+
+chess_wide$Total <- as.numeric(chess_wide$Total)
+chess_wide <- chess_wide %>% rename("Player_Name" = "Player.Name")
+
+kable(chess_wide)
+```
+
+## Visualization
+
+**Now that everything is set up, it's time to make a little visual demonstration for some of the values**
+
+```{r}
+chess_avg <- chess_wide %>% select(Player_State, Total)
+
+Avg_by_State <- chess_avg %>%
+  group_by(Player_State) %>%
+  summarise_at(vars(Total), list(Total = mean))
+
+ggplot(Avg_by_State, aes(x = Player_State, y = Total)) +
+  geom_bar(stat = "identity") + labs(title = "Average Score by State", x = "State", y = "Score")
+```
+**The graph above demonstrates that Ohio had the highest average score when compared to ON (which I am assuming is Ontario?) and Michigan. However, that is not entirely meaningful, since Ohio only had one player. The more meaningful comparison would be that Ontario(?) had a higher average player score than Michigan**
+
+##Saving as a CSV
+
+**The final step would be to save the cleaned and modified dataframe as a CSV file**
+
+```{r}
+chess_csv <- chess_wide
+  
+write.csv(chess_csv, "chess.csv", row.names = F)
+
+```
+
