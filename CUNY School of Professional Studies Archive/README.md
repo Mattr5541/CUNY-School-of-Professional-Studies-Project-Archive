@@ -1,0 +1,1 @@
+These folders contain projects completed for course credit in the CUNY School of Professional Studies' M.S. Data Science Program. All projects contained in these folders were completed with the R programming language
